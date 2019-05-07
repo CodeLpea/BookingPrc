@@ -1,1 +1,1 @@
-include ':Number1carView', ':TestBaseActivity', ':FlowerOpen', ':SelfView'
+include ':Number1carView', ':TestBaseActivity', ':FlowerOpen', ':SelfView', ':NetListen'

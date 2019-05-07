@@ -9,6 +9,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/FlowerOpen" />
+            <option value="$PROJECT_DIR$/NetListen" />
             <option value="$PROJECT_DIR$/Number1carView" />
             <option value="$PROJECT_DIR$/SelfView" />
             <option value="$PROJECT_DIR$/TestBaseActivity" />
