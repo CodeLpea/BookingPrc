@@ -12,11 +12,10 @@ import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.support.annotation.RequiresApi;
-import android.support.v4.content.FileProvider;
+import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -25,13 +24,18 @@ import android.view.View;
 
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
+import com.example.lp.myapplication.Service.downLoadService;
+import com.example.lp.myapplication.util.ZipUtil;
 import com.zhy.base.fileprovider.FileProvider7;
 
 import java.io.File;
 
+import static com.example.lp.myapplication.inter.configInterface.DonwLoadPath;
+import static com.example.lp.myapplication.inter.configInterface.DonwLoadZipName;
+
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG="MainActivity";
 
     private DownloadManager mDownloadManager;
     private long mId;
@@ -39,17 +43,35 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar mProgressBar;
     private TextView mPrecent;
     private TextView mComplete;
-    private String path=Environment.getExternalStorageDirectory().getPath()+ File.separator + "ddnDetect"+File.separator + "download";
+
     private myHandler mhandler;
+    private BroadcastReceiver downLoadastReceiver;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        init();
-        installApk();
+        initCurrentDownLoad();//前台下载
+        updateServiceDownLoad();//后台下载
+        initBroadcat();
     }
-    private void init() {
+
+    private void initBroadcat() {
+        downLoadastReceiver  =new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                String status=intent.getStringExtra("status");
+                String detail=intent.getStringExtra("detail");
+                Log.i(TAG, "status: "+status);
+                Log.i(TAG, "detail: "+detail);
+
+            }
+        };
+        IntentFilter intentFilter = new IntentFilter("com.lp.downloadapp");
+        LocalBroadcastManager.getInstance(MyApplication.getInstance()).registerReceiver(downLoadastReceiver,intentFilter);
+    }
+
+    private void initCurrentDownLoad() {
         mhandler=new myHandler();
        //1、网络获取版本号，跟本地apk版本号比对,如果发现服务器版本号高于本地版本号即弹出对话框，提醒用户更新
         new AlertDialog.Builder(MainActivity.this)
@@ -65,13 +87,25 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         updateDownLoad(dialog);//开启更新
+
+
                     }
                 })
                 .create().show();
 
     }
 
+    /**
+     * 下载的后台方法
+     * */
+    private void updateServiceDownLoad(){
+        Log.i(TAG, "updateServiceDownLoad: ");
+        Intent intentdownLoad = new Intent(this, downLoadService.class);
+        MyApplication.getInstance().startService(intentdownLoad);
+    }
+
     private void updateDownLoad(DialogInterface dialog){
+
         //此处使用DownLoadManager开启下载任务
         mDownloadManager = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
 
@@ -80,18 +114,22 @@ public class MainActivity extends AppCompatActivity {
         // 下载过程和下载完成后通知栏有通知消息。
         request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE | DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
         request.setTitle("下载");
-        request.setDescription("apk正在下载");
+        request.setDescription("正在下载");
         //设置保存目录  /storage/emulated/0/Android/包名/files/Download
         //  request.setDestinationInExternalFilesDir(MainActivity.this, Environment.DIRECTORY_DOWNLOADS,"jiaogeyi.apk");
-        request.setDestinationInExternalPublicDir(path,"ddnDetect.zip");
-        mId = mDownloadManager.enqueue(request);
+       // request.setDestinationInExternalPublicDir(DonwLoadPath,"ddnDetect.zip");
 
+         File file = new File(DonwLoadPath, DonwLoadZipName);
+        //这个Uri不用使用FileProvider
+         Uri fileUri1= Uri.fromFile(file);
+         request.setDestinationUri(fileUri1);
+         mId = mDownloadManager.enqueue(request);
         //注册内容观察者，实时显示进度
         MyContentObserver downloadChangeObserver = new MyContentObserver(null);
         getContentResolver().registerContentObserver(Uri.parse("content://downloads/my_downloads"), true, downloadChangeObserver);
 
         //广播监听下载完成
-        //listener(mId);
+         listener(mId);
         //弹出进度条，先隐藏前一个dialog
         dialog.dismiss();
         //显示进度的对话框
@@ -104,14 +142,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void installApk(){
-        File file = new File(Environment.getExternalStorageDirectory(), "test.apk");
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        // 仅需改变这一行
-        FileProvider7.setIntentDataAndType(this,
-                intent, "application/vnd.android.package-archive", file, true);
-        startActivity(intent);
-    }
+
     private void listener(final long id) {
         //Toast.makeText(MainActivity.this,"XXXX",Toast.LENGTH_SHORT).show();
         IntentFilter intentFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
@@ -121,19 +152,13 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(Context context, Intent intent) {
                 long longExtra = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
                 if (id == longExtra){
-//                    Uri downloadUri = mDownloadManager.getUriForDownloadedFile(id);
-                    Intent install = new Intent(Intent.ACTION_VIEW);
-                    File apkFile = getExternalFilesDir("DownLoad/jiaogeyi.apk");
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N){
-                        install.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        Uri uriForFile = FileProvider.getUriForFile(context, "com.example.lp.myapplication.fileprovider", apkFile);
-                        install.setDataAndType(uriForFile,"application/vnd.android.package-archive");
-                    }else {
-                        install.setDataAndType(Uri.fromFile(apkFile),"application/vnd.android.package-archive");
+                    File srcZipFile = new File(DonwLoadPath, DonwLoadZipName);
+                   boolean result= ZipUtil.unzip(srcZipFile, DonwLoadPath);
+                    Log.i(TAG, "result: "+result);
+                    if(result){
+                        File apkFile=new File(DonwLoadPath,"test.apk");
+                        installApk(apkFile);
                     }
-                    install.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startActivity(install);
-                    Toast.makeText(MainActivity.this,"ZZZZ",Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -141,6 +166,7 @@ public class MainActivity extends AppCompatActivity {
 
         registerReceiver(broadcastReceiver,intentFilter);
     }
+
 
     class MyContentObserver extends ContentObserver {
 
@@ -190,4 +216,24 @@ public class MainActivity extends AppCompatActivity {
 
         }
     }
+
+    private void installApk(File file){
+        //File file = new File(Environment.getExternalStorageDirectory(), "test.apk");
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        // 仅需改变这一行
+        FileProvider7.setIntentDataAndType(this,
+                intent, "application/vnd.android.package-archive", file, true);
+        startActivity(intent);
+       // sendInstallOk();
+    }
+    private void sendInstallOk() {
+        Log.i(TAG, "发送安装成功广播: ");
+        //静态注册自启动广播
+        Intent intents=new Intent();
+        //与清单文件的receiver的anction对应
+        intents.setAction("android.intent.action.PACKAGE_REPLACED");
+        //发送广播
+        MyApplication.getInstance().sendBroadcast(intents);
+    }
+
 }
