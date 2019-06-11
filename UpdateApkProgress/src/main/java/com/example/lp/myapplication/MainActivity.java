@@ -22,6 +22,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 
+import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
@@ -41,8 +42,11 @@ public class MainActivity extends AppCompatActivity {
     private long mId;
     private Dialog mDialog1;
     private ProgressBar mProgressBar;
+    private ProgressBar progesss;
+    private TextView progesssValue;
     private TextView mPrecent;
     private TextView mComplete;
+    private Button btn_backDown;
 
     private myHandler mhandler;
     private BroadcastReceiver downLoadastReceiver;
@@ -51,9 +55,23 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        initCurrentDownLoad();//前台下载
+        initView();
+       // initCurrentDownLoad();//前台下载
         updateServiceDownLoad();//后台下载
         initBroadcat();
+    }
+
+    private void initView() {
+        progesss = (ProgressBar) findViewById(R.id.progesss1);
+        progesssValue = (TextView) findViewById(R.id.progesss_value1);
+        btn_backDown=findViewById(R.id.btn_banckDown);
+        btn_backDown.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.i(TAG, "onClick: ");
+                updateServiceDownLoad();//后台下载
+            }
+        });
     }
 
     private void initBroadcat() {
@@ -64,6 +82,12 @@ public class MainActivity extends AppCompatActivity {
                 String detail=intent.getStringExtra("detail");
                 Log.i(TAG, "status: "+status);
                 Log.i(TAG, "detail: "+detail);
+                if(status.equals("progress")){
+                    int cuureentProgess= Integer.parseInt(detail);
+                    progesss.setProgress(cuureentProgess);
+                    progesssValue.setText(new StringBuffer().append(progesss.getProgress()).append("%"));
+                }
+
 
             }
         };
@@ -86,7 +110,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("立即更新", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        updateDownLoad(dialog);//开启更新
+                        //updateDownLoad(dialog);//开启更新
 
 
                     }

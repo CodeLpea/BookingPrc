@@ -14,6 +14,8 @@ import com.liulishuo.filedownloader.FileDownloadListener;
 import com.liulishuo.filedownloader.FileDownloader;
 
 import java.io.File;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.example.lp.myapplication.inter.configInterface.DonwLoadPath;
 import static com.example.lp.myapplication.inter.configInterface.DonwLoadZipName;
@@ -23,23 +25,31 @@ import static com.example.lp.myapplication.inter.configInterface.LOCAL_BROADCAST
 public class downLoadService extends IntentService {
     private static final String TAG="downLoadService";
 
+    private Lock queueLock = new ReentrantLock();
+    private int queueLen = 0;
 
-    /**
-     * Creates an IntentService.  Invoked by your subclass's constructor.
-     *
-     * @param name Used to name the worker thread, important only for debugging.
-     */
-    public downLoadService(String name) {
-        super(name);
-    }
 
     public downLoadService() {
         super(downLoadService.class.getSimpleName());
     }
+    @Override
+    public void onStart(@Nullable Intent intent, int startId) {
+        /**
+         * intentservice将消息放入消息队列，如果队列长度过长，那么抛弃后续的消息
+         * 避免队列过长
+         */
+        Log.i(TAG, "onStart: ");
+        if (queueLen < 5) {
+            super.onStart(intent, startId);
+            addMessageLen();
+        } else{
 
+        }
+    }
     @Override
     protected void onHandleIntent(@Nullable Intent intent) {
         StartDownLoad();
+        reduceMessageLen();
     }
 
     private void StartDownLoad() {
@@ -102,6 +112,27 @@ public class downLoadService extends IntentService {
            // textView.setText("("+percent+"%"+")");
         }
     }
+
+    /**
+     * 增加消息队列长度
+     */
+    public void addMessageLen() {
+        Log.i(TAG, "addMessageLen: ");
+        queueLock.lock();
+        queueLen++;
+        queueLock.unlock();
+    }
+
+    /**
+     * 减少消息队列长度
+     */
+    public void reduceMessageLen() {
+        Log.i(TAG, "reduceMessageLen: ");
+        queueLock.lock();
+        queueLen--;
+        queueLock.unlock();
+    }
+
 
     public void notifyUpgradeStatus(String status, String detail) {
         Intent intent = new Intent(DOWNLOAD_APP_ACTION);
